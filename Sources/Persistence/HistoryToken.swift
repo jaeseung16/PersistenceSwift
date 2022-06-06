@@ -11,7 +11,7 @@ import os
 
 @available(iOS 14.0, *)
 @available(macOS 11.0, *)
-class HistoryToken {
+public class HistoryToken {
     private static let logger = Logger()
     
     private static let pathComponent = "token.data"

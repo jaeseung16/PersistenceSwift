@@ -35,8 +35,8 @@ public class Persistence {
         purgeHistory()
     }
 
-    let container: NSPersistentCloudKitContainer
-    var historyToken: HistoryToken
+    public let container: NSPersistentCloudKitContainer
+    public var historyToken: HistoryToken
 
     // MARK: - Purge History
     private func purgeHistory() {
