@@ -85,7 +85,7 @@ public class Persistence {
             try self.container.viewContext.save()
         } catch {
             self.container.viewContext.rollback()
-            Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription)")
+            Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription): \(Thread.callStackSymbols)")
             err = error
         }
         completionHandler(err != nil ? .failure(err!) : .success(()))
