@@ -17,7 +17,7 @@ public class Subscriber {
     let subscriptionID: String
     let recordType: String
     
-    init(database: CKDatabase, subscriptionID: String, recordType: String) {
+    public init(database: CKDatabase, subscriptionID: String, recordType: String) {
         self.database = database
         self.subscriptionID = subscriptionID
         self.recordType = recordType
