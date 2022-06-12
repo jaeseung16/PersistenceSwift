@@ -29,6 +29,8 @@ public class DatabaseOperationHelper {
     }
     
     public func addDatabaseChangesOperation(database: CKDatabase, completionHandler: @escaping (Result<CKRecord, Error>) -> Void) -> Void {
+        self.logger.log("Adding a database change operation for database=\(database, privacy: .public)")
+        
         let dbChangesOperation = CKFetchDatabaseChangesOperation(previousServerChangeToken: self.serverToken)
         
         dbChangesOperation.recordZoneWithIDChangedBlock = {

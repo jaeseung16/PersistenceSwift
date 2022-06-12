@@ -8,8 +8,10 @@
 import Foundation
 import CoreData
 import CloudKit
+import os
 
 public class NotificationTokenHelper {
+    static private let logger = Logger()
     static private let key = "token"
     
     private let appName: String
@@ -26,8 +28,7 @@ public class NotificationTokenHelper {
                                                         withIntermediateDirectories: true,
                                                         attributes: nil)
             } catch {
-                let message = "Could not create persistent container URL for NotificationToken \(tokenType.rawValue)"
-                print("\(message): \(error)")
+                NotificationTokenHelper.logger.log("Could not create persistent container URL for a NotificationToken \(tokenType.rawValue, privacy: .public)")
             }
         }
         return url.appendingPathComponent("\(tokenType.rawValue).data", isDirectory: false)
