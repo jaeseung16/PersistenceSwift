@@ -9,8 +9,6 @@ import Foundation
 import CoreData
 import os
 
-@available(iOS 14.0, *)
-@available(macOS 11.0, *)
 public class HistoryToken {
     private static let logger = Logger()
     
@@ -28,8 +26,7 @@ public class HistoryToken {
             do {
                 try data.write(to: tokenFile)
             } catch {
-                let message = "Could not write token data"
-                print("###\(#function): \(message): \(error)")
+                HistoryToken.logger.log("Could not write history token data: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -42,7 +39,7 @@ public class HistoryToken {
                                                         withIntermediateDirectories: true,
                                                         attributes: nil)
             } catch {
-                HistoryToken.logger.log("Could not create tokenFile at \(url): \(error.localizedDescription)")
+                HistoryToken.logger.log("Could not create token file at \(url): \(error.localizedDescription)")
             }
         }
         return url.appendingPathComponent(HistoryToken.pathComponent, isDirectory: false)
