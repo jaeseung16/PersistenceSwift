@@ -34,7 +34,7 @@ public class DatabaseOperationHelper {
         let dbChangesOperation = CKFetchDatabaseChangesOperation(previousServerChangeToken: self.serverToken)
         
         dbChangesOperation.recordZoneWithIDChangedBlock = {
-            self.addZoneChangesOperation(database: database, zoneId: $0, completionHandelr: completionHandler)
+            self.addZoneChangesOperation(database: database, zoneId: $0, completionHandler: completionHandler)
         }
         
         dbChangesOperation.changeTokenUpdatedBlock = { token in
@@ -65,7 +65,7 @@ public class DatabaseOperationHelper {
         return zoneToken
     }
     
-    private func addZoneChangesOperation(database: CKDatabase, zoneId: CKRecordZone.ID, completionHandelr: @escaping (Result<CKRecord, Error>) -> Void) -> Void {
+    private func addZoneChangesOperation(database: CKDatabase, zoneId: CKRecordZone.ID, completionHandler: @escaping (Result<CKRecord, Error>) -> Void) -> Void {
         var configurations = [CKRecordZone.ID: CKFetchRecordZoneChangesOperation.ZoneConfiguration]()
         let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration()
         config.previousServerChangeToken = self.zoneToken
@@ -76,10 +76,10 @@ public class DatabaseOperationHelper {
         zoneChangesOperation.recordWasChangedBlock = { recordID, result in
             switch(result) {
             case .success(let record):
-                completionHandelr(.success(record))
+                completionHandler(.success(record))
             case .failure(let error):
                 self.logger.log("Failed to check if record was changed: recordID=\(recordID, privacy: .public), error=\(error.localizedDescription, privacy: .public))")
-                completionHandelr(.failure(error))
+                completionHandler(.failure(error))
             }
         }
         
