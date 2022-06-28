@@ -50,6 +50,10 @@ public class Persistence {
         }
     }
     
+    public func invalidateHistoryToken() {
+        historyToken.last = nil
+    }
+    
     // MARK: - Persistence History Request
     private lazy var historyRequestQueue = DispatchQueue(label: "history")
     public func fetchUpdates(_ notification: Notification, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
