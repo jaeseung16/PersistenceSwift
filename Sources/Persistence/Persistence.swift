@@ -6,11 +6,16 @@ import os
 public class Persistence {
     private static let logger = Logger()
     
-    public private(set) var text = "Hello, World!"
+    public private(set) var container: NSPersistentContainer
+    public private(set) var usingCloud: Bool
     
-    public init(name: String, identifier: String, inMemory: Bool = false) {
-        // TODO: NSPersistentContainer or NSPersistentCloudKitContainer
-        container = NSPersistentCloudKitContainer(name: name)
+    public var cloudContainer: NSPersistentCloudKitContainer? {
+        return usingCloud ? container as? NSPersistentCloudKitContainer : nil
+    }
+    
+    public init(name: String, identifier: String, inMemory: Bool = false, isCloud: Bool = true) {
+        self.usingCloud = isCloud
+        container = isCloud ? NSPersistentCloudKitContainer(name: name) : NSPersistentContainer(name: name)
         
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
@@ -34,8 +39,7 @@ public class Persistence {
         
         purgeHistory()
     }
-
-    public let container: NSPersistentCloudKitContainer
+    
     public var historyToken: HistoryToken
 
     // MARK: - Purge History
