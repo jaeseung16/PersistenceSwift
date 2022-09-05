@@ -100,4 +100,16 @@ public class Persistence {
         }
         completionHandler(err != nil ? .failure(err!) : .success(()))
     }
+    
+    // MARK: - Helper
+    public func count(_ entityName: String) -> Int {
+        var count = 0
+        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+        do {
+            count = try self.container.viewContext.count(for: fetchRequest)
+        } catch {
+            Persistence.logger.error("Can't count \(entityName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+        return count
+    }
 }
