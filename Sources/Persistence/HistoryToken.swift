@@ -49,7 +49,7 @@ public class HistoryToken {
         self.appPathComponent = appPathComponent
         
         if let data = try? Data(contentsOf: tokenFile) {
-            self.last = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data) as? NSPersistentHistoryToken
+            self.last = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
         }
     }
 }
