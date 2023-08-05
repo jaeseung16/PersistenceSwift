@@ -112,4 +112,13 @@ public class Persistence {
         }
         return count
     }
+    
+    // MARK: - NSCoreDataCoreSpotlightDelegate
+    func createCoreSpotlightDelegate<T: NSCoreDataCoreSpotlightDelegate>() -> T? {
+        if let persistentStoreDescription = container.persistentStoreDescriptions.first {
+            return T(forStoreWith: persistentStoreDescription, coordinator: container.persistentStoreCoordinator)
+        }
+        Persistence.logger.log("Can't initialize NSCoreDataCoreSpotlightDelegate: container.persistentStoreDescriptions=\(self.container.persistentStoreDescriptions, privacy: .public)")
+        return nil
+    }
 }
