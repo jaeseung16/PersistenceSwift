@@ -99,6 +99,11 @@ public class Persistence {
     }
     
     public func save(completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+        guard self.container.viewContext.hasChanges else {
+            Persistence.logger.debug("There are no changes to save")
+            completionHandler(.success(()))
+            return
+        }
         var err: Error?
         do {
             try self.container.viewContext.save()
