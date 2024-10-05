@@ -98,21 +98,27 @@ public class Persistence {
         }
     }
     
+    @available(*, renamed: "save()")
     public func save(completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+        Task {
+            do {
+                try await save()
+                completionHandler(.success(()))
+            } catch {
+                self.container.viewContext.rollback()
+                Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
+                
+                completionHandler(.failure(error))
+            }
+        }
+    }
+    
+    public func save() async throws {
         guard self.container.viewContext.hasChanges else {
             Persistence.logger.debug("There are no changes to save")
-            completionHandler(.success(()))
             return
         }
-        var err: Error?
-        do {
-            try self.container.viewContext.save()
-        } catch {
-            self.container.viewContext.rollback()
-            Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
-            err = error
-        }
-        completionHandler(err != nil ? .failure(err!) : .success(()))
+        try self.container.viewContext.save()
     }
     
     // MARK: - Helper
