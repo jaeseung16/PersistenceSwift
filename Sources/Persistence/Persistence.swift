@@ -90,7 +90,7 @@ public class Persistence {
     
     // MARK: - Save
     public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
-        var currentContextName = container.viewContext.name
+        let currentContextName = container.viewContext.name
         container.viewContext.name = contextName
         save { result in
             self.container.viewContext.name = currentContextName
