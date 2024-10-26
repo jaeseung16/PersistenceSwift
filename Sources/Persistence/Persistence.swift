@@ -104,7 +104,7 @@ public actor Persistence {
     }
     
     // MARK: - NSCoreDataCoreSpotlightDelegate
-    public func createCoreSpotlightDelegate<T: NSCoreDataCoreSpotlightDelegate>() -> T? {
+    nonisolated public func createCoreSpotlightDelegate<T: NSCoreDataCoreSpotlightDelegate>() -> T? {
         if let persistentStoreDescription = container.persistentStoreDescriptions.first {
             return T(forStoreWith: persistentStoreDescription, coordinator: container.persistentStoreCoordinator)
         }
