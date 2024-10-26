@@ -1,13 +1,14 @@
 import CoreData
 import os
 
-@available(iOS 14.0, *)
-@available(macOS 11.0, *)
-public class Persistence {
+@available(iOS 17.0, *)
+@available(macOS 14.0, *)
+public actor Persistence {
     private static let logger = Logger()
     
-    public private(set) var container: NSPersistentContainer
-    public private(set) var usingCloud: Bool
+    public let container: NSPersistentContainer
+    private let usingCloud: Bool
+    private let historyRequestHandler: HistoryRequestHandler
     
     public var cloudContainer: NSPersistentCloudKitContainer? {
         return usingCloud ? container as? NSPersistentCloudKitContainer : nil
@@ -37,54 +38,23 @@ public class Persistence {
         Persistence.logger.log("persistentStores = \(String(describing: self.container.persistentStoreCoordinator.persistentStores))")
         container.viewContext.name = name
         
-        historyToken = HistoryToken(appPathComponent: name)
+        historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
         
-        purgeHistory()
-    }
-    
-    public var historyToken: HistoryToken
-
-    // MARK: - Purge History
-    private func purgeHistory() {
-        let purgeHistoryRequest = NSPersistentHistoryChangeRequest.deleteHistory(before: historyToken.last)
-        do {
-            try container.newBackgroundContext().execute(purgeHistoryRequest)
-        } catch {
-            if let error = error as NSError? {
-                Persistence.logger.error("Could not purge history: \(error), \(error.userInfo)")
-            }
+        Task {
+            await historyRequestHandler.purgeHistory()
         }
     }
     
     public func invalidateHistoryToken() {
-        historyToken.last = nil
+        Task {
+            await historyRequestHandler.invalidateHistoryToken()
+        }
     }
     
     // MARK: - Persistence History Request
-    private lazy var historyRequestQueue = DispatchQueue(label: "history")
     public func fetchUpdates(_ notification: Notification, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
-        historyRequestQueue.async {
-            let backgroundContext = self.container.newBackgroundContext()
-            backgroundContext.performAndWait {
-                do {
-                    let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: self.historyToken.last)
-                    
-                    if let historyResult = try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult,
-                       let history = historyResult.result as? [NSPersistentHistoryTransaction] {
-                        for transaction in history.reversed() {
-                            self.container.viewContext.perform {
-                                self.container.viewContext.mergeChanges(fromContextDidSave: transaction.objectIDNotification())
-                                self.historyToken.last = transaction.token
-                            }
-                        }
-
-                        completionHandler(.success(()))
-                    }
-                } catch {
-                    Persistence.logger.error("Could not convert history result to transactions after lastToken = \(String(describing: self.historyToken.last)): \(error.localizedDescription)")
-                    completionHandler(.failure(error))
-                }
-            }
+        Task {
+            await historyRequestHandler.fetchUpdates(notification, completionHandler: completionHandler)
         }
     }
     
