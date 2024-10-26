@@ -6,7 +6,7 @@ import os
 public actor Persistence {
     private static let logger = Logger()
     
-    public let container: NSPersistentContainer
+    nonisolated public let container: NSPersistentContainer
     private let usingCloud: Bool
     private let historyRequestHandler: HistoryRequestHandler
     
