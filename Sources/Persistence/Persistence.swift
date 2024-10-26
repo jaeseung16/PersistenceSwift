@@ -92,7 +92,7 @@ public actor Persistence {
     }
     
     // MARK: - Helper
-    public func count(_ entityName: String) -> Int {
+    nonisolated public func count(_ entityName: String) -> Int {
         var count = 0
         let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
         do {
