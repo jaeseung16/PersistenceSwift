@@ -36,13 +36,17 @@ public actor HistoryToken {
     public init(appPathComponent: String) {
         self.appPathComponent = appPathComponent
         self.tokenFile = HistoryToken.tokenFileURL(appPathComponent)
-        
+       
         if let data = try? Data(contentsOf: tokenFile) {
             self.last = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
         }
+        
+        HistoryToken.logger.log("tokenFile=\(self.tokenFile, privacy: .public)")
+        
     }
     
     public func getToken() -> NSPersistentHistoryToken? {
+        HistoryToken.logger.log("last=\(self.last, privacy: .public)")
         return last
     }
 
