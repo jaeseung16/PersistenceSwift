@@ -57,7 +57,9 @@ public actor Persistence {
             await historyRequestHandler.fetchUpdates(notification) { result in
                 switch result {
                 case .success(let notification):
-                    self.container.viewContext.mergeChanges(fromContextDidSave: notification)
+                    self.container.viewContext.perform {
+                        self.container.viewContext.mergeChanges(fromContextDidSave: notification)
+                    }
                     completionHandler(.success(Void()))
                 case .failure(let error):
                     completionHandler(.failure(error))
