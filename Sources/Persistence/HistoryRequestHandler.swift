@@ -63,10 +63,7 @@ actor HistoryRequestHandler {
     }
     
     private func fetchHistoryTransactions(_ notification: Notification) async throws -> [NSPersistentHistoryTransaction] {
-        guard let token = await historyToken.getToken() else {
-            HistoryRequestHandler.logger.error("Could not find token")
-            throw PersistenceError.tokenNotFound
-        }
+        let token = await historyToken.getToken()
         
         let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
         let backgroundContext = self.container.newBackgroundContext()
