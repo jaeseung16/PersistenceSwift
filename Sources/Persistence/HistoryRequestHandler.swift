@@ -45,7 +45,7 @@ actor HistoryRequestHandler {
     
     // MARK: - Persistence History Request
     
-    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Void, Error>) -> Void) -> Void {
         Task {
             guard let token = await self.historyToken.getToken() else {
                 completionHandler(.failure(PersistenceError.tokenNotFound))
