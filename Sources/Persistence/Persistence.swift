@@ -99,6 +99,10 @@ public actor Persistence {
         try self.container.viewContext.save()
     }
     
+    public func perform(_ block: @escaping @Sendable () -> Void) -> Void {
+        self.container.viewContext.perform(block)
+    }
+    
     // MARK: - Helper
     nonisolated public func count(_ entityName: String) -> Int {
         var count = 0
