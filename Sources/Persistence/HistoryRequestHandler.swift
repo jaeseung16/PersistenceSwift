@@ -45,28 +45,40 @@ actor HistoryRequestHandler {
     
     // MARK: - Persistence History Request
     
-    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Void, Error>) -> Void) -> Void {
+    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
         Task {
-            guard let token = await self.historyToken.getToken() else {
-                completionHandler(.failure(PersistenceError.tokenNotFound))
-                return
-            }
-            
-            let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
-            let backgroundContext = self.container.newBackgroundContext()
-            
-            if let historyResult = try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult,
-               let history = historyResult.result as? [NSPersistentHistoryTransaction] {
+            do {
+                let history = try await fetchHistoryTransactions(notification)
                 for transaction in history.reversed() {
-                    self.container.viewContext.mergeChanges(fromContextDidSave: transaction.objectIDNotification())
-                    
+                    completionHandler(.success(transaction.objectIDNotification()))
                     Task {
                         await self.historyToken.setToken(transaction.token)
                     }
                 }
-                completionHandler(.success(()))
+            } catch {
+                completionHandler(.failure(error))
             }
+            
         }
+    }
+    
+    private func fetchHistoryTransactions(_ notification: Notification) async throws -> [NSPersistentHistoryTransaction] {
+        guard let token = await historyToken.getToken() else {
+            throw PersistenceError.tokenNotFound
+        }
+        
+        let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
+        let backgroundContext = self.container.newBackgroundContext()
+        
+        guard let historyResult = try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult else {
+            throw PersistenceError.fetchHistoryFailed
+        }
+
+        guard let historyTransactions = historyResult.result as? [NSPersistentHistoryTransaction] else {
+            throw PersistenceError.historyTransactionsNotFound
+        }
+        
+        return historyTransactions.reversed()
     }
     
 }

@@ -7,4 +7,6 @@
 
 enum PersistenceError: Error {
     case tokenNotFound
+    case fetchHistoryFailed
+    case historyTransactionsNotFound
 }
