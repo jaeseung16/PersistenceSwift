@@ -52,7 +52,7 @@ public actor Persistence {
     }
     
     // MARK: - Persistence History Request
-    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Void, Error>) -> Void) -> Void {
+    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
         Task {
             await historyRequestHandler.fetchUpdates(notification) { result in
                 switch result {
@@ -60,7 +60,7 @@ public actor Persistence {
                     self.container.viewContext.perform {
                         self.container.viewContext.mergeChanges(fromContextDidSave: notification)
                     }
-                    completionHandler(.success(Void()))
+                    completionHandler(.success(notification))
                 case .failure(let error):
                     completionHandler(.failure(error))
                 }

@@ -48,8 +48,8 @@ actor HistoryRequestHandler {
     public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
         Task {
             do {
-                let history = try await fetchHistoryTransactions(notification)
-                for transaction in history.reversed() {
+                let transactions = try await fetchHistoryTransactions(notification)
+                for transaction in transactions {
                     completionHandler(.success(transaction.objectIDNotification()))
                     Task {
                         await self.historyToken.setToken(transaction.token)
