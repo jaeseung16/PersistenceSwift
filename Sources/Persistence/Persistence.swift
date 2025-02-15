@@ -45,13 +45,12 @@ public actor Persistence {
         }
     }
     
-    public func invalidateHistoryToken() {
-        Task {
-            await historyRequestHandler.invalidateHistoryToken()
-        }
+    public func invalidateHistoryToken() async {
+        await historyRequestHandler.invalidateHistoryToken()
     }
     
     // MARK: - Persistence History Request
+    @available(*, deprecated, message: "Use fetchUpdates(_:) instead")
     public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
         Task {
             await historyRequestHandler.fetchUpdates(notification) { result in
@@ -66,6 +65,10 @@ public actor Persistence {
                 }
             }
         }
+    }
+    
+    public func fetchUpdates(_ notification: Notification) async throws -> [NSManagedObjectID] {
+        return try await historyRequestHandler.fetchUpdates()
     }
     
     // MARK: - Save
