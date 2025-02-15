@@ -10,7 +10,8 @@ import CoreData
 import os
 
 // Reference: https://williamboles.me/progressive-core-data-migration/
-public class DatabaseMigrator: NSObject {
+@MainActor
+public class DatabaseMigrator {
     let logger = Logger()
     
     let sourceModelURL: URL
@@ -21,8 +22,6 @@ public class DatabaseMigrator: NSObject {
         self.sourceModelURL = sourceModelURL
         self.destinationModelURL = destinationModelURL
         self.storeURL = storeURL
-        
-        super.init()
     }
     
     private var _sourceModel: NSManagedObjectModel?
@@ -46,24 +45,34 @@ public class DatabaseMigrator: NSObject {
     }
     
     public func isMigrationNecessary() -> Bool {
-        guard self.sourceModel != nil, let destinationModel = self.destinationModel else {
+        guard self.sourceModel != nil,
+              let destinationModel = self.destinationModel,
+              let sourceMetaData = self.sourceMetadata(storeURL: storeURL) else {
             return false
         }
-        
-        guard let sourceMetaData = self.sourceMetadata(storeURL: storeURL) else {
-            return false
-        }
-      
         return !destinationModel.isConfiguration(withName: nil, compatibleWithStoreMetadata: sourceMetaData)
     }
     
     public func migrate(completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+        do {
+            try migrate()
+            completionHandler(.success(()))
+        } catch {
+            completionHandler(.failure(error))
+        }
+    }
+    
+    public func migrate() throws -> Void {
         guard let sourceModel = self.sourceModel, let destinationModel = self.destinationModel else {
             return
         }
         
-        forceWALCheckpointingForStore(at: storeURL) { error in
-            completionHandler(.failure(error))
+        do {
+            try forceWALCheckpointingForStore(at: storeURL)
+        } catch {
+            logger.error("Cannot force WAL checkpointing for persistent stores ar \(self.storeURL, privacy: .public): \(error.localizedDescription, privacy: .public)")
+           
+            throw error
         }
         
         let temporaryDestinationURL = temporaryDirectory.appendingPathComponent(storeURL.lastPathComponent)
@@ -75,7 +84,8 @@ public class DatabaseMigrator: NSObject {
             try migrationManager.migrateStore(from: storeURL, type: .sqlite, options: nil, mapping: mappingModel!, to: temporaryDestinationURL, type: .sqlite, options: nil)
         } catch {
             logger.error("Cannot migrate persistent stores from \(self.storeURL, privacy: .public) to \(temporaryDestinationURL, privacy: .public) with using \(mappingModel.debugDescription, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            completionHandler(.failure(error))
+           
+            throw error
         }
         
         replaceStore(at: storeURL, with: temporaryDestinationURL)
@@ -83,26 +93,29 @@ public class DatabaseMigrator: NSObject {
         
         _sourceModel = nil
         _destinationModel = nil
-        
-        completionHandler(.success(()))
     }
     
     private func forceWALCheckpointingForStore(at storeURL: URL, completionHandler: @escaping (Error) -> Void) {
+        do {
+            try forceWALCheckpointingForStore(at: storeURL)
+        } catch {
+            logger.error("failed to force WAL checkpointing: \(error.localizedDescription, privacy: .public)")
+            completionHandler(error)
+        }
+    }
+    
+    private func forceWALCheckpointingForStore(at storeURL: URL) throws -> Void {
         let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: storeURL, options: nil)
         
         guard let metadata = metadata, let currentModel = compatibleModelForStoreMetadata(metadata) else {
             return
         }
-
-        do {
-            let persistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: currentModel)
-            let options = [NSSQLitePragmasOption: ["journal_mode": "DELETE"]]
-            let store = try persistentStoreCoordinator.addPersistentStore(type: .sqlite, at: storeURL, options: options)
-            try persistentStoreCoordinator.remove(store)
-        } catch {
-            logger.error("failed to force WAL checkpointing: \(error.localizedDescription, privacy: .public)")
-            completionHandler(error)
-        }
+        
+        let persistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: currentModel)
+        let options = [NSSQLitePragmasOption: ["journal_mode": "DELETE"]]
+        let store = try persistentStoreCoordinator.addPersistentStore(type: .sqlite, at: storeURL, options: options)
+        
+        try persistentStoreCoordinator.remove(store)
     }
     
     private func compatibleModelForStoreMetadata(_ metadata: [String : Any]) -> NSManagedObjectModel? {
@@ -120,12 +133,13 @@ public class DatabaseMigrator: NSObject {
     private func replaceStore(at storeURL: URL, with replacingStoreURL: URL) {
         do {
             let persistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: NSManagedObjectModel())
-            try persistentStoreCoordinator.replacePersistentStore(at: storeURL, destinationOptions: nil, withPersistentStoreFrom: replacingStoreURL, sourceOptions: nil, type: .sqlite)
-            
+            try persistentStoreCoordinator.replacePersistentStore(at: storeURL,
+                                                                  destinationOptions: nil,
+                                                                  withPersistentStoreFrom: replacingStoreURL,
+                                                                  sourceOptions: nil,
+                                                                  type: .sqlite)
         } catch {
-            if let error = error as NSError? {
-                logger.error("failed to replace persistent store at \(storeURL, privacy: .public) with \(replacingStoreURL, privacy: .public), error: \(error.localizedDescription, privacy: .public)")
-            }
+            logger.error("failed to replace persistent store at \(storeURL, privacy: .public) with \(replacingStoreURL, privacy: .public), error: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -134,9 +148,7 @@ public class DatabaseMigrator: NSObject {
             let persistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: NSManagedObjectModel())
             try persistentStoreCoordinator.destroyPersistentStore(at: storeURL, type: .sqlite, options: nil)
         } catch {
-            if let error = error as NSError? {
-                logger.error("failed to destroy persistent store at \(storeURL, privacy: .public), error: \(error.localizedDescription, privacy: .public)")
-            }
+            logger.error("failed to destroy persistent store at \(storeURL, privacy: .public), error: \(error.localizedDescription, privacy: .public)")
         }
     }
     
