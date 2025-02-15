@@ -10,7 +10,7 @@ import CoreData
 import CloudKit
 import os
 
-public actor DatabaseOperationHelper {
+public class DatabaseOperationHelper {
     private let logger = Logger()
     
     private let notificationTokenHelper: NotificationTokenHelper
