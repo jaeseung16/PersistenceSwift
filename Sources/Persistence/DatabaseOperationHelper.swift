@@ -10,7 +10,7 @@ import CoreData
 import CloudKit
 import os
 
-public class DatabaseOperationHelper {
+public actor DatabaseOperationHelper {
     private let logger = Logger()
     
     private let notificationTokenHelper: NotificationTokenHelper
@@ -58,7 +58,13 @@ public class DatabaseOperationHelper {
     }
     
     private var zoneToken: CKServerChangeToken? {
-        let zoneToken = try? notificationTokenHelper.read(.zone)
+        var zoneToken: CKServerChangeToken?
+        do {
+            zoneToken = try notificationTokenHelper.read(.zone)
+        } catch {
+            self.logger.log("Failed to read zone token: \(String(describing: error))")
+        }
+        
         if zoneToken != nil {
             tokenCache[.zone] = zoneToken
         }
@@ -90,11 +96,19 @@ public class DatabaseOperationHelper {
         zoneChangesOperation.recordZoneFetchResultBlock = { recordZoneID, result in
             switch(result) {
             case .success((let serverToken, _, _)):
-                try? self.notificationTokenHelper.write(serverToken, for: .zone)
+                do {
+                    try self.notificationTokenHelper.write(serverToken, for: .zone)
+                } catch {
+                    self.logger.log("Failed to write notification token: serverToken=\(serverToken, privacy: .public), error=\(error.localizedDescription, privacy: .public)")
+                }
             case .failure(let error):
                 self.logger.log("Failed to fetch zone changes: recordZoneID=\(recordZoneID, privacy: .public), error=\(error.localizedDescription, privacy: .public)")
                 if let lastToken = self.tokenCache[.zone] {
-                    try? self.notificationTokenHelper.write(lastToken, for: .zone)
+                    do {
+                        try self.notificationTokenHelper.write(lastToken, for: .zone)
+                    } catch {
+                        self.logger.log("Failed to write notification token: lastToken=\(lastToken, privacy: .public), error=\(error.localizedDescription, privacy: .public)")
+                    }
                 }
             }
         }
