@@ -6,6 +6,11 @@ final class PersistenceTests: XCTestCase {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
-        XCTAssertEqual(Persistence(name: "persistence", identifier: "iCloud.com.resonance.jlee.persistence").usingCloud, true)
+        
+        Task {
+            let persistence = Persistence(name: "persistence", identifier: "iCloud.com.resonance.jlee.persistence")
+            let container = await persistence.cloudContainer
+            XCTAssertEqual(container != nil, true)
+        }
     }
 }
