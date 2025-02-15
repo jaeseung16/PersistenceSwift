@@ -10,7 +10,7 @@ import Foundation
 import os
 
 actor HistoryRequestHandler {
-    private static let logger = Logger()
+    private let logger = Logger()
     
     private let container: NSPersistentContainer
     private let historyToken: HistoryToken
@@ -22,59 +22,64 @@ actor HistoryRequestHandler {
     
     // MARK: - Purge History
     func purgeHistory() {
-        Task {
-            guard let token = await historyToken.getToken() else {
-                return
-            }
-            
-            let purgeHistoryRequest = NSPersistentHistoryChangeRequest.deleteHistory(before: token)
-            do {
-                try container.newBackgroundContext().execute(purgeHistoryRequest)
-            } catch {
-                if let error = error as NSError? {
-                    HistoryRequestHandler.logger.error("Could not purge history: \(error), \(error.userInfo)")
-                }
-            }
+        guard let token = historyToken.getToken() else {
+            return
         }
         
+        let purgeHistoryRequest = NSPersistentHistoryChangeRequest.deleteHistory(before: token)
+        do {
+            try container.newBackgroundContext().execute(purgeHistoryRequest)
+        } catch {
+            logger.error("Could not purge history: \(error.localizedDescription, privacy: .public)")
+        }
     }
     
     public func invalidateHistoryToken() async {
-        await historyToken.setToken(nil)
+        historyToken.setToken(nil)
     }
     
     // MARK: - Persistence History Request
-    
     public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
-        Task {
-            do {
-                let transactions = try await fetchHistoryTransactions(notification)
-                for transaction in transactions {
-                    completionHandler(.success(transaction.objectIDNotification()))
-                    Task {
-                        await self.historyToken.setToken(transaction.token)
-                    }
-                }
-            } catch {
-                completionHandler(.failure(error))
+        do {
+            let transactions = try fetchHistoryTransactions()
+            for transaction in transactions {
+                completionHandler(.success(transaction.objectIDNotification()))
+                self.historyToken.setToken(transaction.token)
             }
-            
+        } catch {
+            completionHandler(.failure(error))
         }
     }
     
-    private func fetchHistoryTransactions(_ notification: Notification) async throws -> [NSPersistentHistoryTransaction] {
-        let token = await historyToken.getToken()
+    public func fetchUpdates() async throws -> [NSManagedObjectID] {
+        let transactions = try fetchHistoryTransactions()
+        
+        var results: [NSManagedObjectID] = []
+        for transaction in transactions {
+            let notification = transaction.objectIDNotification()
+            if let userInfo = notification.userInfo {
+                userInfo.forEach { key, value in
+                    if let objectIDs = value as? Set<NSManagedObjectID> {
+                        results.append(contentsOf: objectIDs)
+                    }
+                }
+            }
+            historyToken.setToken(transaction.token)
+        }
+        return results
+    }
+    
+    private func fetchHistoryTransactions() throws -> [NSPersistentHistoryTransaction] {
+        let token = historyToken.getToken()
         
         let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
-        let backgroundContext = self.container.newBackgroundContext()
+        let backgroundContext = container.newBackgroundContext()
         
         guard let historyResult = try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult else {
-            HistoryRequestHandler.logger.error("Could not execute fetch history request")
             throw PersistenceError.fetchHistoryFailed
         }
 
         guard let historyTransactions = historyResult.result as? [NSPersistentHistoryTransaction] else {
-            HistoryRequestHandler.logger.error("Could not cast history transactions")
             throw PersistenceError.historyTransactionsNotFound
         }
         

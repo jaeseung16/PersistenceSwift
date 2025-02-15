@@ -9,7 +9,7 @@ import Foundation
 import CoreData
 import os
 
-public actor HistoryToken {
+public class HistoryToken {
     private static let logger = Logger()
     
     private static let pathComponent = "token.data"
