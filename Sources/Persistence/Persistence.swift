@@ -88,7 +88,7 @@ public actor Persistence {
                 try await save()
                 completionHandler(.success(()))
             } catch {
-                self.container.viewContext.rollback()
+                container.viewContext.rollback()
                 Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
                 
                 completionHandler(.failure(error))
@@ -97,15 +97,15 @@ public actor Persistence {
     }
     
     public func save() async throws {
-        guard self.container.viewContext.hasChanges else {
+        guard container.viewContext.hasChanges else {
             Persistence.logger.debug("There are no changes to save")
             return
         }
-        try self.container.viewContext.save()
+        try container.viewContext.save()
     }
     
     public func perform(_ block: @escaping @Sendable () -> Void) -> Void {
-        self.container.viewContext.perform(block)
+        container.viewContext.perform(block)
     }
     
     // MARK: - Helper
