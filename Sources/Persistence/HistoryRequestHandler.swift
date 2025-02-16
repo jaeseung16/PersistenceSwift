@@ -57,6 +57,8 @@ actor HistoryRequestHandler {
         var results: [NSManagedObjectID] = []
         for transaction in transactions {
             let notification = transaction.objectIDNotification()
+            container.viewContext.mergeChanges(fromContextDidSave: notification)
+            
             if let userInfo = notification.userInfo {
                 userInfo.forEach { key, value in
                     if let objectIDs = value as? Set<NSManagedObjectID> {
