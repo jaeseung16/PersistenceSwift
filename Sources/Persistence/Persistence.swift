@@ -67,7 +67,7 @@ public actor Persistence {
         }
     }
     
-    public func fetchUpdates(_ notification: Notification) async throws -> [NSManagedObjectID] {
+    public func fetchUpdates() async throws -> [NSManagedObjectID] {
         return try await historyRequestHandler.fetchUpdates()
     }
     
