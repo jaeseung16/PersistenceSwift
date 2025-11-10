@@ -49,24 +49,6 @@ public actor Persistence {
         await historyRequestHandler.invalidateHistoryToken()
     }
     
-    // MARK: - Persistence History Request
-    @available(*, deprecated, message: "Use fetchUpdates(_:) instead")
-    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
-        Task {
-            await historyRequestHandler.fetchUpdates(notification) { result in
-                switch result {
-                case .success(let notification):
-                    self.container.viewContext.perform {
-                        self.container.viewContext.mergeChanges(fromContextDidSave: notification)
-                    }
-                    completionHandler(.success(notification))
-                case .failure(let error):
-                    completionHandler(.failure(error))
-                }
-            }
-        }
-    }
-    
     public func fetchUpdates() async throws -> [NSManagedObjectID] {
         return try await historyRequestHandler.fetchUpdates()
     }
