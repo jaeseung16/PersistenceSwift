@@ -22,9 +22,8 @@ let package = Package(
         .target(
             name: "Persistence",
             dependencies: [],
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-        ]),
+            swiftSettings: [],
+        ),
         .testTarget(
             name: "PersistenceTests",
             dependencies: ["Persistence"]),
