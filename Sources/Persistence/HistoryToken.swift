@@ -14,24 +14,12 @@ public class HistoryToken {
     
     private static let pathComponent = "token.data"
     
-    private var appPathComponent: String
+    private let appPathComponent: String
+    private let tokenFile: URL
     
-    var last: NSPersistentHistoryToken? = nil {
-        didSet {
-            guard let token = last,
-                  let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) else {
-                return
-            }
-            
-            do {
-                try data.write(to: tokenFile)
-            } catch {
-                HistoryToken.logger.log("Could not write history token data: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-    }
+    private var last: NSPersistentHistoryToken?
     
-    private lazy var tokenFile: URL = {
+    private static func tokenFileURL(_ appPathComponent: String) -> URL {
         let url = NSPersistentContainer.defaultDirectoryURL().appendingPathComponent(appPathComponent, isDirectory: true)
         if !FileManager.default.fileExists(atPath: url.path) {
             do {
@@ -43,13 +31,37 @@ public class HistoryToken {
             }
         }
         return url.appendingPathComponent(HistoryToken.pathComponent, isDirectory: false)
-    }()
+    }
     
     public init(appPathComponent: String) {
         self.appPathComponent = appPathComponent
-        
+        self.tokenFile = HistoryToken.tokenFileURL(appPathComponent)
+       
         if let data = try? Data(contentsOf: tokenFile) {
             self.last = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSPersistentHistoryToken.self, from: data)
+        }
+        
+        HistoryToken.logger.log("tokenFile=\(self.tokenFile, privacy: .public)")
+        
+    }
+    
+    public func getToken() -> NSPersistentHistoryToken? {
+        HistoryToken.logger.log("last=\(self.last, privacy: .public)")
+        return last
+    }
+
+    public func setToken(_ historyToken: NSPersistentHistoryToken?) -> Void {
+        last = historyToken
+        
+        guard let token = last,
+              let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) else {
+            return
+        }
+        
+        do {
+            try data.write(to: tokenFile)
+        } catch {
+            HistoryToken.logger.log("Could not write history token data: \(error.localizedDescription, privacy: .public)")
         }
     }
 }
