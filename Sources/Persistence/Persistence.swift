@@ -1,8 +1,8 @@
 import CoreData
 import os
 
-@available(iOS 17.0, *)
-@available(macOS 14.0, *)
+@available(iOS 26.0, *)
+@available(macOS 26.0, *)
 public actor Persistence {
     private static let logger = Logger()
     
