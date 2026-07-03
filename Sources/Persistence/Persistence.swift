@@ -55,14 +55,19 @@ public actor Persistence {
     
     // MARK: - Save
     public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
-        let currentContextName = container.viewContext.name
-        container.viewContext.name = contextName
+        let context = container.viewContext
+        let currentContextName = context.performAndWait { context.name }
+        context.performAndWait {
+            context.name = contextName
+        }
         save { result in
-            self.container.viewContext.name = currentContextName
+            context.perform {
+                context.name = currentContextName
+            }
             completionHandler(result)
         }
     }
-    
+
     @available(*, renamed: "save()")
     public func save(completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
         Task {
@@ -70,7 +75,10 @@ public actor Persistence {
                 try await save()
                 completionHandler(.success(()))
             } catch {
-                container.viewContext.rollback()
+                let context = container.viewContext
+                await context.perform {
+                    context.rollback()
+                }
                 Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
                 
                 completionHandler(.failure(error))
@@ -79,11 +87,16 @@ public actor Persistence {
     }
     
     public func save() async throws {
-        guard container.viewContext.hasChanges else {
-            Persistence.logger.debug("There are no changes to save")
-            return
+        // viewContext is main-queue confined; the actor executor is not the main queue,
+        // so every touch of the context must go through perform.
+        let context = container.viewContext
+        try await context.perform {
+            guard context.hasChanges else {
+                Persistence.logger.debug("There are no changes to save")
+                return
+            }
+            try context.save()
         }
-        try container.viewContext.save()
     }
     
     public func perform(_ block: @escaping @Sendable () -> Void) -> Void {
@@ -92,14 +105,16 @@ public actor Persistence {
     
     // MARK: - Helper
     nonisolated public func count(_ entityName: String) -> Int {
-        var count = 0
-        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
-        do {
-            count = try self.container.viewContext.count(for: fetchRequest)
-        } catch {
-            Persistence.logger.error("Can't count \(entityName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        let context = container.viewContext
+        return context.performAndWait {
+            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+            do {
+                return try context.count(for: fetchRequest)
+            } catch {
+                Persistence.logger.error("Can't count \(entityName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return 0
+            }
         }
-        return count
     }
     
     // MARK: - NSCoreDataCoreSpotlightDelegate
