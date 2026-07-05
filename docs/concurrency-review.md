@@ -88,6 +88,15 @@ concern.)
 | 3 | Replace `save(with:)` name juggling with a single async method doing set-name → save → restore-name inside one `context.perform` block; remove `performAndWait` from actor-isolated code; keep the completion variant as a thin wrapper | Done |
 | 4 | Init hygiene: set `viewContext.name` through the context's queue; replace the fire-and-forget purge `Task` with a lazy purge on the first `fetchUpdates()` pass | Done |
 | 5 | Cleanup: delete the token file on `setToken(nil)`; remove the dead migrator checkpoint overload; rewrite the test as `async` with an in-memory, non-cloud container (added a model-injecting `Persistence.init` so tests do not depend on `Bundle.main`) | Done |
+| 6 | Bind `HistoryRequestHandler` to its background context's queue with a hand-rolled SE-392 serial executor (`ManagedObjectContextExecutor`), so history requests use the context directly and nothing blocks in `performAndWait` | Done |
+
+Phase 6 came out of evaluating CoreDataEvolution's `@NSModelActor` macro
+(https://fatbobman.com/en/posts/core-data-reform-achieving-elegant-concurrency-operations-like-swiftdata/):
+the macro's technique — an actor whose serial executor is a managed object
+context's queue — fits `HistoryRequestHandler` exactly, but a dependency on a
+macro package (and its swift-syntax build cost) was not justified for one
+internal actor, so the executor is hand-rolled. The macro remains a good fit
+for domain-level data handlers in apps that consume this package.
 
 Deferred (API design decisions, not taken up here):
 

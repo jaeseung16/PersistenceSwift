@@ -23,4 +23,15 @@ final class PersistenceTests: XCTestCase {
         try await persistence.save()
         try await persistence.save(with: "test-context")
     }
+
+    // Drives the history-request path, which runs HistoryRequestHandler's
+    // jobs on its background context's queue via the custom executor.
+    func testFetchUpdatesOnEmptyStoreReturnsNothing() async throws {
+        let persistence = makePersistence()
+        // Discard any token left on disk by a previous run so the fetch
+        // starts from the beginning of (empty) history.
+        await persistence.invalidateHistoryToken()
+        let objectIDs = try await persistence.fetchUpdates()
+        XCTAssertTrue(objectIDs.isEmpty)
+    }
 }

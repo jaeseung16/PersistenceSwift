@@ -43,5 +43,5 @@ This package is mid-migration to Swift 6 concurrency (see recent commits): async
 Core Data queue confinement is enforced explicitly and matters more than the actor isolation:
 
 - `container.viewContext` is main-queue confined — every touch (even reading `name` or `hasChanges`) goes through `context.perform { }` / `performAndWait { }`, never directly from an actor's executor.
-- Background contexts (`newBackgroundContext()`) are private-queue confined — `execute(_:)` for history requests runs inside `performAndWait` on that context.
+- `HistoryRequestHandler` uses a custom serial executor (`ManagedObjectContextExecutor`, SE-392) bound to its background context's queue, so inside that actor the context is used directly — no `perform`/`performAndWait`. Merges into `viewContext` still hop queues via `context.perform`.
 - `nonisolated(unsafe)` is used sparingly for non-`Sendable` values (e.g. `Notification`) that are created locally and handed into a `perform` block; keep such uses justified with a comment as in `HistoryRequestHandler.fetchUpdates()`.

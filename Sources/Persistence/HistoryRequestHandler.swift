@@ -11,16 +11,27 @@ import os
 
 actor HistoryRequestHandler {
     private let logger = Logger()
-    
+
     private let container: NSPersistentContainer
     private let historyToken: HistoryToken
+    private let backgroundContext: NSManagedObjectContext
+    private let executor: ManagedObjectContextExecutor
     private var activeFetch: Task<[NSManagedObjectID], Error>?
+
+    // The actor's jobs run on backgroundContext's queue, so history requests
+    // can use the context directly instead of blocking in performAndWait.
+    nonisolated var unownedExecutor: UnownedSerialExecutor {
+        executor.asUnownedSerialExecutor()
+    }
 
     init(container: NSPersistentContainer, historyToken: HistoryToken) {
         self.container = container
         self.historyToken = historyToken
+        let backgroundContext = container.newBackgroundContext()
+        self.backgroundContext = backgroundContext
+        self.executor = ManagedObjectContextExecutor(context: backgroundContext)
     }
-    
+
     // MARK: - Purge History
     private var needsPurge = true
 
@@ -41,12 +52,8 @@ actor HistoryRequestHandler {
         }
         
         let purgeHistoryRequest = NSPersistentHistoryChangeRequest.deleteHistory(before: token)
-        let backgroundContext = container.newBackgroundContext()
         do {
-            // Background contexts are private-queue confined; execute must run on that queue.
-            try backgroundContext.performAndWait {
-                _ = try backgroundContext.execute(purgeHistoryRequest)
-            }
+            _ = try backgroundContext.execute(purgeHistoryRequest)
         } catch {
             logger.error("Could not purge history: \(error.localizedDescription, privacy: .public)")
         }
@@ -105,12 +112,8 @@ actor HistoryRequestHandler {
         let token = historyToken.getToken()
         
         let fetchHistoryRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
-        let backgroundContext = container.newBackgroundContext()
 
-        // Background contexts are private-queue confined; execute must run on that queue.
-        guard let historyResult = try backgroundContext.performAndWait({
-            try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult
-        }) else {
+        guard let historyResult = try backgroundContext.execute(fetchHistoryRequest) as? NSPersistentHistoryResult else {
             throw PersistenceError.fetchHistoryFailed
         }
 
