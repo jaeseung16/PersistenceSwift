@@ -14,9 +14,15 @@ public actor Persistence {
         return usingCloud ? container as? NSPersistentCloudKitContainer : nil
     }
     
-    public init(name: String, identifier: String, inMemory: Bool = false, isCloud: Bool = true) {
+    public init(name: String, identifier: String, model: NSManagedObjectModel? = nil, inMemory: Bool = false, isCloud: Bool = true) {
         self.usingCloud = isCloud
-        container = isCloud ? NSPersistentCloudKitContainer(name: name) : NSPersistentContainer(name: name)
+        // NSPersistentContainer(name:) only searches Bundle.main for the
+        // model; an explicit model supports test bundles and frameworks.
+        if let model {
+            container = isCloud ? NSPersistentCloudKitContainer(name: name, managedObjectModel: model) : NSPersistentContainer(name: name, managedObjectModel: model)
+        } else {
+            container = isCloud ? NSPersistentCloudKitContainer(name: name) : NSPersistentContainer(name: name)
+        }
         
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")

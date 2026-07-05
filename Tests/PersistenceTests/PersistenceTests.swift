@@ -2,15 +2,25 @@ import XCTest
 @testable import Persistence
 
 final class PersistenceTests: XCTestCase {
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct
-        // results.
-        
-        Task {
-            let persistence = Persistence(name: "persistence", identifier: "iCloud.com.resonance.jlee.persistence")
-            let container = await persistence.cloudContainer
-            XCTAssertEqual(container != nil, true)
-        }
+    // In-memory, non-cloud container so the test does not need CloudKit
+    // entitlements or touch a real store file.
+    private func makePersistence() -> Persistence {
+        Persistence(name: "persistence",
+                    identifier: "iCloud.com.resonance.jlee.persistence",
+                    model: NSManagedObjectModel(),
+                    inMemory: true,
+                    isCloud: false)
+    }
+
+    func testLocalContainerHasNoCloudContainer() async throws {
+        let persistence = makePersistence()
+        let cloudContainer = await persistence.cloudContainer
+        XCTAssertNil(cloudContainer)
+    }
+
+    func testSaveWithoutChangesDoesNotThrow() async throws {
+        let persistence = makePersistence()
+        try await persistence.save()
+        try await persistence.save(with: "test-context")
     }
 }

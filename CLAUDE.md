@@ -11,7 +11,7 @@ A Swift package (`Persistence`) wrapping Core Data + CloudKit sync for apps on A
 ```sh
 swift build                                   # build
 swift test                                    # run all tests
-swift test --filter PersistenceTests/testExample   # run a single test
+swift test --filter PersistenceTests/testLocalContainerHasNoCloudContainer   # run a single test
 ```
 
 Tests are XCTest-based in `Tests/PersistenceTests/`.

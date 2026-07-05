@@ -87,7 +87,7 @@ concern.)
 | 2 | Coalesce concurrent `fetchUpdates()` calls onto a single in-flight task so the token read → process → write section cannot interleave; drop the unused completion-handler variant | Done |
 | 3 | Replace `save(with:)` name juggling with a single async method doing set-name → save → restore-name inside one `context.perform` block; remove `performAndWait` from actor-isolated code; keep the completion variant as a thin wrapper | Done |
 | 4 | Init hygiene: set `viewContext.name` through the context's queue; replace the fire-and-forget purge `Task` with a lazy purge on the first `fetchUpdates()` pass | Done |
-| 5 | Cleanup: delete the token file on `setToken(nil)`; remove the dead migrator checkpoint overload; rewrite the test as `async` with an in-memory, non-cloud container | Planned |
+| 5 | Cleanup: delete the token file on `setToken(nil)`; remove the dead migrator checkpoint overload; rewrite the test as `async` with an in-memory, non-cloud container (added a model-injecting `Persistence.init` so tests do not depend on `Bundle.main`) | Done |
 
 Deferred (API design decisions, not taken up here):
 
