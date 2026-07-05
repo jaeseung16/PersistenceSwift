@@ -36,13 +36,15 @@ public actor Persistence {
         })
         
         Persistence.logger.log("persistentStores = \(String(describing: self.container.persistentStoreCoordinator.persistentStores))")
-        container.viewContext.name = name
-        
-        historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
-        
-        Task {
-            await historyRequestHandler.purgeHistory()
+
+        // viewContext is main-queue confined; even setting its name must go
+        // through its queue.
+        let viewContext = container.viewContext
+        viewContext.performAndWait {
+            viewContext.name = name
         }
+
+        historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
     }
     
     public func invalidateHistoryToken() async {

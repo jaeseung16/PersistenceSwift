@@ -22,7 +22,20 @@ actor HistoryRequestHandler {
     }
     
     // MARK: - Purge History
-    func purgeHistory() {
+    private var needsPurge = true
+
+    // History already consumed before the stored token only wastes disk
+    // space, so purging can wait until the first fetch pass instead of
+    // racing an unstructured task at init.
+    private func purgeHistoryIfNeeded() {
+        guard needsPurge else {
+            return
+        }
+        needsPurge = false
+        purgeHistory()
+    }
+
+    private func purgeHistory() {
         guard let token = historyToken.getToken() else {
             return
         }
@@ -61,6 +74,8 @@ actor HistoryRequestHandler {
     }
 
     private func processUpdates() async throws -> [NSManagedObjectID] {
+        purgeHistoryIfNeeded()
+
         let transactions = try fetchHistoryTransactions()
         
         var results: [NSManagedObjectID] = []
