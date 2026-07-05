@@ -14,6 +14,7 @@ actor HistoryRequestHandler {
     
     private let container: NSPersistentContainer
     private let historyToken: HistoryToken
+    private var activeFetch: Task<[NSManagedObjectID], Error>?
 
     init(container: NSPersistentContainer, historyToken: HistoryToken) {
         self.container = container
@@ -43,19 +44,23 @@ actor HistoryRequestHandler {
     }
     
     // MARK: - Persistence History Request
-    public func fetchUpdates(_ notification: Notification, completionHandler: @escaping @Sendable (Result<Notification, Error>) -> Void) -> Void {
-        do {
-            let transactions = try fetchHistoryTransactions()
-            for transaction in transactions {
-                completionHandler(.success(transaction.objectIDNotification()))
-                self.historyToken.setToken(transaction.token)
-            }
-        } catch {
-            completionHandler(.failure(error))
-        }
-    }
-    
     public func fetchUpdates() async throws -> [NSManagedObjectID] {
+        // The actor is reentrant at the awaits inside processUpdates(): a
+        // second call arriving mid-pass would re-read the same history token
+        // and merge the same transactions twice. Concurrent callers therefore
+        // join the in-flight pass instead of starting their own.
+        if let activeFetch {
+            return try await activeFetch.value
+        }
+        let fetch = Task {
+            defer { activeFetch = nil }
+            return try await processUpdates()
+        }
+        activeFetch = fetch
+        return try await fetch.value
+    }
+
+    private func processUpdates() async throws -> [NSManagedObjectID] {
         let transactions = try fetchHistoryTransactions()
         
         var results: [NSManagedObjectID] = []
