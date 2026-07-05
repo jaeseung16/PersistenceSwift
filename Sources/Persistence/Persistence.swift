@@ -54,17 +54,33 @@ public actor Persistence {
     }
     
     // MARK: - Save
-    public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+    public func save(with contextName: String) async throws {
         let context = container.viewContext
-        let currentContextName = context.performAndWait { context.name }
-        context.performAndWait {
+        // Rename, save, and restore inside one perform block so overlapping
+        // saves cannot attribute a commit to the wrong context name.
+        try await context.perform {
+            let currentContextName = context.name
             context.name = contextName
-        }
-        save { result in
-            context.perform {
-                context.name = currentContextName
+            defer { context.name = currentContextName }
+
+            guard context.hasChanges else {
+                Persistence.logger.debug("There are no changes to save")
+                return
             }
-            completionHandler(result)
+            try context.save()
+        }
+    }
+
+    @available(*, renamed: "save(with:)")
+    public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+        Task {
+            do {
+                try await save(with: contextName)
+                completionHandler(.success(()))
+            } catch {
+                await rollback(after: error)
+                completionHandler(.failure(error))
+            }
         }
     }
 
@@ -75,17 +91,20 @@ public actor Persistence {
                 try await save()
                 completionHandler(.success(()))
             } catch {
-                let context = container.viewContext
-                await context.perform {
-                    context.rollback()
-                }
-                Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
-                
+                await rollback(after: error)
                 completionHandler(.failure(error))
             }
         }
     }
-    
+
+    private func rollback(after error: Error) async {
+        let context = container.viewContext
+        await context.perform {
+            context.rollback()
+        }
+        Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
+    }
+
     public func save() async throws {
         // viewContext is main-queue confined; the actor executor is not the main queue,
         // so every touch of the context must go through perform.
