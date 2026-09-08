@@ -10,7 +10,11 @@ import CoreData
 import CloudKit
 import os
 
-public class NotificationTokenHelper {
+// Stateless apart from immutable configuration; note that the token-file
+// reads/writes themselves are not synchronized — callers are responsible for
+// serializing access to a given token file (DatabaseOperationHelper does so
+// with its token lock).
+public final class NotificationTokenHelper: Sendable {
     static private let logger = Logger()
     static private let key = "token"
     

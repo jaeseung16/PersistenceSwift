@@ -95,15 +95,6 @@ public class DatabaseMigrator {
         _destinationModel = nil
     }
     
-    private func forceWALCheckpointingForStore(at storeURL: URL, completionHandler: @escaping (Error) -> Void) {
-        do {
-            try forceWALCheckpointingForStore(at: storeURL)
-        } catch {
-            logger.error("failed to force WAL checkpointing: \(error.localizedDescription, privacy: .public)")
-            completionHandler(error)
-        }
-    }
-    
     private func forceWALCheckpointingForStore(at storeURL: URL) throws -> Void {
         let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: storeURL, options: nil)
         

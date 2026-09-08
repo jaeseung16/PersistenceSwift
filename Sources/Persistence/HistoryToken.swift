@@ -52,12 +52,24 @@ public class HistoryToken {
 
     public func setToken(_ historyToken: NSPersistentHistoryToken?) -> Void {
         last = historyToken
-        
-        guard let token = last,
-              let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) else {
+
+        guard let token = last else {
+            // Invalidation must also remove the file, or the stale token is
+            // reloaded on the next launch.
+            if FileManager.default.fileExists(atPath: tokenFile.path) {
+                do {
+                    try FileManager.default.removeItem(at: tokenFile)
+                } catch {
+                    HistoryToken.logger.log("Could not remove history token file: \(error.localizedDescription, privacy: .public)")
+                }
+            }
             return
         }
-        
+
+        guard let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) else {
+            return
+        }
+
         do {
             try data.write(to: tokenFile)
         } catch {

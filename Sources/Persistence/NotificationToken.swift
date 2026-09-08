@@ -7,6 +7,6 @@
 
 import Foundation
 
-public enum NotificationTokenType: String {
+public enum NotificationTokenType: String, Sendable {
     case server, zone
 }

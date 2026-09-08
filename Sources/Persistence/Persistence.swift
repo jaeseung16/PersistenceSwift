@@ -14,9 +14,15 @@ public actor Persistence {
         return usingCloud ? container as? NSPersistentCloudKitContainer : nil
     }
     
-    public init(name: String, identifier: String, inMemory: Bool = false, isCloud: Bool = true) {
+    public init(name: String, identifier: String, model: NSManagedObjectModel? = nil, inMemory: Bool = false, isCloud: Bool = true) {
         self.usingCloud = isCloud
-        container = isCloud ? NSPersistentCloudKitContainer(name: name) : NSPersistentContainer(name: name)
+        // NSPersistentContainer(name:) only searches Bundle.main for the
+        // model; an explicit model supports test bundles and frameworks.
+        if let model {
+            container = isCloud ? NSPersistentCloudKitContainer(name: name, managedObjectModel: model) : NSPersistentContainer(name: name, managedObjectModel: model)
+        } else {
+            container = isCloud ? NSPersistentCloudKitContainer(name: name) : NSPersistentContainer(name: name)
+        }
         
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
@@ -36,13 +42,15 @@ public actor Persistence {
         })
         
         Persistence.logger.log("persistentStores = \(String(describing: self.container.persistentStoreCoordinator.persistentStores))")
-        container.viewContext.name = name
-        
-        historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
-        
-        Task {
-            await historyRequestHandler.purgeHistory()
+
+        // viewContext is main-queue confined; even setting its name must go
+        // through its queue.
+        let viewContext = container.viewContext
+        viewContext.performAndWait {
+            viewContext.name = name
         }
+
+        historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
     }
     
     public func invalidateHistoryToken() async {
@@ -54,15 +62,36 @@ public actor Persistence {
     }
     
     // MARK: - Save
-    public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
-        let currentContextName = container.viewContext.name
-        container.viewContext.name = contextName
-        save { result in
-            self.container.viewContext.name = currentContextName
-            completionHandler(result)
+    public func save(with contextName: String) async throws {
+        let context = container.viewContext
+        // Rename, save, and restore inside one perform block so overlapping
+        // saves cannot attribute a commit to the wrong context name.
+        try await context.perform {
+            let currentContextName = context.name
+            context.name = contextName
+            defer { context.name = currentContextName }
+
+            guard context.hasChanges else {
+                Persistence.logger.debug("There are no changes to save")
+                return
+            }
+            try context.save()
         }
     }
-    
+
+    @available(*, renamed: "save(with:)")
+    public func save(with contextName: String, completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
+        Task {
+            do {
+                try await save(with: contextName)
+                completionHandler(.success(()))
+            } catch {
+                await rollback(after: error)
+                completionHandler(.failure(error))
+            }
+        }
+    }
+
     @available(*, renamed: "save()")
     public func save(completionHandler: @escaping (Result<Void, Error>) -> Void) -> Void {
         Task {
@@ -70,20 +99,31 @@ public actor Persistence {
                 try await save()
                 completionHandler(.success(()))
             } catch {
-                container.viewContext.rollback()
-                Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
-                
+                await rollback(after: error)
                 completionHandler(.failure(error))
             }
         }
     }
-    
-    public func save() async throws {
-        guard container.viewContext.hasChanges else {
-            Persistence.logger.debug("There are no changes to save")
-            return
+
+    private func rollback(after error: Error) async {
+        let context = container.viewContext
+        await context.perform {
+            context.rollback()
         }
-        try container.viewContext.save()
+        Persistence.logger.error("While saving data, occured an unresolved error \(error.localizedDescription, privacy: .public): \(Thread.callStackSymbols, privacy: .public)")
+    }
+
+    public func save() async throws {
+        // viewContext is main-queue confined; the actor executor is not the main queue,
+        // so every touch of the context must go through perform.
+        let context = container.viewContext
+        try await context.perform {
+            guard context.hasChanges else {
+                Persistence.logger.debug("There are no changes to save")
+                return
+            }
+            try context.save()
+        }
     }
     
     public func perform(_ block: @escaping @Sendable () -> Void) -> Void {
@@ -92,14 +132,16 @@ public actor Persistence {
     
     // MARK: - Helper
     nonisolated public func count(_ entityName: String) -> Int {
-        var count = 0
-        let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
-        do {
-            count = try self.container.viewContext.count(for: fetchRequest)
-        } catch {
-            Persistence.logger.error("Can't count \(entityName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        let context = container.viewContext
+        return context.performAndWait {
+            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+            do {
+                return try context.count(for: fetchRequest)
+            } catch {
+                Persistence.logger.error("Can't count \(entityName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return 0
+            }
         }
-        return count
     }
     
     // MARK: - NSCoreDataCoreSpotlightDelegate
