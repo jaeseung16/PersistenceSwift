@@ -48,6 +48,12 @@ public actor Persistence {
         let viewContext = container.viewContext
         viewContext.performAndWait {
             viewContext.name = name
+            // Remote-change notifications are posted but never subscribed to here, so a consumer
+            // that does not wire them to fetchUpdates() would see no merges at all. Auto-merge
+            // keeps the view context correct on its own; the history pass remains the mechanism
+            // that reports which objects changed. Merging a transaction twice is idempotent —
+            // mergeChanges refreshes objects rather than accumulating.
+            viewContext.automaticallyMergesChangesFromParent = true
         }
 
         historyRequestHandler = HistoryRequestHandler(container: container, historyToken: HistoryToken(appPathComponent: name))
