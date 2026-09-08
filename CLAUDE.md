@@ -26,6 +26,8 @@ Two largely independent subsystems live in `Sources/Persistence/`:
 - **`HistoryRequestHandler`** (actor) — fetches `NSPersistentHistoryTransaction`s since the last stored token, merges them into `viewContext`, and purges consumed history. Created by `Persistence` in its initializer.
 - **`HistoryToken`** — persists the last-processed `NSPersistentHistoryToken` to a file under `NSPersistentContainer.defaultDirectoryURL()/<appName>/token.data` so history fetches resume across launches.
 
+`viewContext.automaticallyMergesChangesFromParent` is `true`, so CloudKit imports and other sibling contexts reach the view context without the consumer doing anything. The package posts `.NSPersistentStoreRemoteChange` but never subscribes to it — wiring that notification to `fetchUpdates()` is still the consumer's job, and is what reports *which* objects changed (for Spotlight indexing, UI invalidation, and so on). The two paths may merge the same transaction; `mergeChanges` refreshes objects rather than accumulating, so that is idempotent. The merge policy is left at the default `NSErrorMergePolicy` — conflicting saves throw rather than silently picking a winner.
+
 ### 2. Direct CloudKit change fetching / subscriptions
 
 - **`DatabaseOperationHelper`** — chains `CKFetchDatabaseChangesOperation` → `CKFetchRecordZoneChangesOperation`, delivering changed `CKRecord`s via a completion handler. On failure it falls back to the last in-memory token from `tokenCache`.
