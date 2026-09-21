@@ -64,7 +64,7 @@ actor HistoryRequestHandler {
     }
     
     // MARK: - Persistence History Request
-    public func fetchUpdates() async throws -> [NSManagedObjectID] {
+    public func fetchUpdates(excludingAuthors excludedAuthors: Set<String> = []) async throws -> [NSManagedObjectID] {
         // The actor is reentrant at the awaits inside processUpdates(): a
         // second call arriving mid-pass would re-read the same history token
         // and merge the same transactions twice. Concurrent callers therefore
@@ -74,13 +74,13 @@ actor HistoryRequestHandler {
         }
         let fetch = Task {
             defer { activeFetch = nil }
-            return try await processUpdates()
+            return try await processUpdates(excludingAuthors: excludedAuthors)
         }
         activeFetch = fetch
         return try await fetch.value
     }
 
-    private func processUpdates() async throws -> [NSManagedObjectID] {
+    private func processUpdates(excludingAuthors excludedAuthors: Set<String>) async throws -> [NSManagedObjectID] {
         purgeHistoryIfNeeded()
 
         let transactions = try fetchHistoryTransactions()
@@ -94,6 +94,13 @@ actor HistoryRequestHandler {
             let context = container.viewContext
             await context.perform {
                 context.mergeChanges(fromContextDidSave: notification)
+            }
+
+            // Still merged and consumed, but not reported: typically the consumer's own saves,
+            // which it does not need to be told about
+            if let author = transaction.author, excludedAuthors.contains(author) {
+                historyToken.setToken(transaction.token)
+                continue
             }
 
             if let userInfo = notification.userInfo {

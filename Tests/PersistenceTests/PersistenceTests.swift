@@ -34,4 +34,49 @@ final class PersistenceTests: XCTestCase {
         let objectIDs = try await persistence.fetchUpdates()
         XCTAssertTrue(objectIDs.isEmpty)
     }
+
+    private static func makeModel() -> NSManagedObjectModel {
+        let text = NSAttributeDescription()
+        text.name = "text"
+        text.attributeType = .stringAttributeType
+        text.isOptional = true
+        let note = NSEntityDescription()
+        note.name = "Note"
+        note.properties = [text]
+        let model = NSManagedObjectModel()
+        model.entities = [note]
+        return model
+    }
+
+    private func insertNote(into persistence: Persistence, author: String) async throws {
+        let context = persistence.container.viewContext
+        await context.perform {
+            context.transactionAuthor = author
+            let note = NSManagedObject(entity: context.persistentStoreCoordinator!.managedObjectModel.entitiesByName["Note"]!, insertInto: context)
+            note.setValue(author, forKey: "text")
+        }
+        try await persistence.save()
+    }
+
+    func testFetchUpdatesSkipsExcludedAuthors() async throws {
+        let model = Self.makeModel()
+        let persistence = Persistence(name: "persistence-authors",
+                                      identifier: "iCloud.com.resonance.jlee.persistence",
+                                      model: model,
+                                      inMemory: true,
+                                      isCloud: false)
+        await persistence.invalidateHistoryToken()
+
+        try await insertNote(into: persistence, author: "App")
+        let ownChanges = try await persistence.fetchUpdates(excludingAuthors: ["App"])
+        XCTAssertTrue(ownChanges.isEmpty)
+
+        try await insertNote(into: persistence, author: "Other")
+        let otherChanges = try await persistence.fetchUpdates(excludingAuthors: ["App"])
+        XCTAssertEqual(otherChanges.count, 1)
+
+        // The excluded transaction was consumed, not left for the next fetch
+        let noChanges = try await persistence.fetchUpdates()
+        XCTAssertTrue(noChanges.isEmpty)
+    }
 }
