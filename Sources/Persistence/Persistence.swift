@@ -63,8 +63,11 @@ public actor Persistence {
         await historyRequestHandler.invalidateHistoryToken()
     }
     
-    public func fetchUpdates() async throws -> [NSManagedObjectID] {
-        return try await historyRequestHandler.fetchUpdates()
+    /// Merges persistent history recorded since the last call into the view context and returns
+    /// the IDs of the objects it touched. Transactions whose `author` is in `excludedAuthors` are
+    /// merged and consumed but their objects are not returned, e.g. to ignore the app's own saves.
+    public func fetchUpdates(excludingAuthors excludedAuthors: Set<String> = []) async throws -> [NSManagedObjectID] {
+        return try await historyRequestHandler.fetchUpdates(excludingAuthors: excludedAuthors)
     }
     
     // MARK: - Save
